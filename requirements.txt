@@ -1,0 +1,25 @@
+# --- Agent orchestration & observability ---
+langgraph
+langsmith
+langchain
+langchain-groq
+
+# --- GitHub access ---
+pygithub
+
+# --- Backend & Frontend ---
+fastapi
+uvicorn
+streamlit
+
+# --- Static analysis tools (used by specialist agents later) ---
+pylint
+flake8
+bandit
+coverage
+radon
+pip-audit
+
+# --- Utilities ---
+python-dotenv
+google-generativeai
