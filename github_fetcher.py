@@ -132,6 +132,44 @@ def fetch_pr_context(pr_url: str):
     return file_contexts
 
 
+PYTHON_EXTENSIONS = (".py",)
+
+
+def filter_python_files(file_contexts):
+    """
+    Splits the full list of changed files into two groups:
+
+      - python_files:  files ending in .py — these go to the 7 specialist
+                        agents (Bug-Hunter, Style, Test Coverage, etc.)
+      - skipped_files:  everything else (filenames only) — these do NOT
+                        get sent to the Python-based static analysis agents
+
+    Why keep a "skipped" list instead of just deleting non-Python files:
+    Silently dropping files with no explanation looks like a bug, not a
+    feature. Keeping the filenames lets the Coordinator's final report say
+    something like:
+        "3 files skipped (not Python): App.tsx, style.css, README.md"
+    so the developer understands why those files weren't reviewed, instead
+    of wondering if the tool missed them.
+
+    Note: the Security Agent's secret/credential-leak check (e.g. finding
+    a committed .env or .pem file) is the one exception — that check runs
+    on ALL files, including the skipped ones, since secrets can appear in
+    any file type. That check should receive the full, unfiltered
+    file_contexts list separately, not just python_files.
+    """
+    python_files = []
+    skipped_files = []
+
+    for fc in file_contexts:
+        if fc["filename"].endswith(PYTHON_EXTENSIONS):
+            python_files.append(fc)
+        else:
+            skipped_files.append(fc["filename"])
+
+    return python_files, skipped_files
+
+
 def print_summary(file_contexts):
     """Small helper to print a clean, readable summary in the terminal."""
     print(f"\nFound {len(file_contexts)} changed file(s):\n")
@@ -145,8 +183,18 @@ def print_summary(file_contexts):
 
 
 if __name__ == "__main__":
-    # EDIT THIS to test on a real PR from one of your own repos.
-    TEST_PR_URL = "https://github.com/amir-ali-asif/AI-Meeting-Intelligence-System/pull/1"
+    # The test PR link is read from your .env file (TEST_PR_URL) instead of
+    # being hardcoded here. This keeps any specific project/repo links out
+    # of the committed code — safer and cleaner for a public portfolio repo.
+    TEST_PR_URL = os.getenv("TEST_PR_URL")
+
+    if not TEST_PR_URL:
+        raise SystemExit(
+            "Missing TEST_PR_URL in your .env file.\n"
+            "Add a line like:\n"
+            "  TEST_PR_URL=https://github.com/owner/repo/pull/1\n"
+            "then run this script again."
+        )
 
     contexts = fetch_pr_context(TEST_PR_URL)
     print_summary(contexts)
@@ -156,3 +204,10 @@ if __name__ == "__main__":
     if contexts:
         print("--- Full file_context for first changed file ---")
         print(contexts[0])
+
+    # Preview of the Day 6 filtering step (not wired into the pipeline yet,
+    # just demonstrated here so you can see it working on real PR data).
+    python_files, skipped_files = filter_python_files(contexts)
+    print(f"\n{len(python_files)} Python file(s) would go to the agents.")
+    if skipped_files:
+        print(f"{len(skipped_files)} file(s) would be skipped (not Python): {skipped_files}")

@@ -16,6 +16,18 @@ This project solves that by building an AI system that acts as a full, always-av
 
 ---
 
+## Scope & Limitations
+
+**This project currently reviews Python (`.py`) code only.**
+
+Every static analysis tool in the stack — `pylint`, `flake8`, `bandit`, `coverage.py`, `radon`, `pip-audit`, and the `ast`-based documentation check — is Python-specific. A PR that changes non-Python files (JavaScript, Java, config files, etc.) will still be fetched in full, but only the `.py` files are sent to the 6 language-specific specialist agents for review.
+
+- Non-Python files are **not silently dropped** — they're explicitly filtered out and listed in the final Coordinator report (e.g. *"3 files skipped (not Python): App.tsx, style.css, README.md"*) so the developer always knows what was and wasn't reviewed.
+- **One exception:** the Security Agent's secret/credential-leak check (see below) runs on **every changed file regardless of language**, since a leaked API key or private key file can appear in any file type, not just Python.
+- Multi-language support (e.g. ESLint for JS/TS, Semgrep for cross-language security scanning) is a natural next step and is listed under Future Work.
+
+---
+
 ## How It Works (Planned Full Pipeline)
 
 ```
@@ -23,10 +35,12 @@ GitHub PR Link (input)
         ↓
 PyGithub fetches diff + old code + new code   ✅ built (Day 2)
         ↓
+Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day 6)
+        ↓
    ┌────────────────────────────────────────┐
    │     7 Specialist Agents (parallel)       │  🚧 in progress (Days 3-5)
    │  1. Bug-Hunter Agent                     │
-   │  2. Security Agent                       │
+   │  2. Security Agent*                      │
    │  3. Style/Readability Agent              │
    │  4. Test Coverage Agent                  │
    │  5. Documentation Agent                  │
@@ -34,11 +48,16 @@ PyGithub fetches diff + old code + new code   ✅ built (Day 2)
    │  7. Dependency/License Agent             │
    │  (each = static analysis tool + LLM,     │
    │   all traced live in LangSmith)          │
+   │                                            │
+   │  *Security Agent also scans ALL changed   │
+   │   files (any language) for secrets/keys   │
+   │   accidentally committed to the PR        │
    └────────────────┬─────────────────────────┘
                      ↓
               Coordinator Agent                  ⏳ planned (Day 6)
    (merges findings, resolves conflicts/duplicates,
-    prioritizes issues, writes final verdict)
+    prioritizes issues, notes skipped files,
+    writes final verdict)
                      ↓
          Final Report (FastAPI + Streamlit)       ⏳ planned (Days 7-8)
          + Full reasoning trace in LangSmith
@@ -46,7 +65,18 @@ PyGithub fetches diff + old code + new code   ✅ built (Day 2)
 
 Each specialist agent combines the output of a **real static analysis tool** with **LLM reasoning** to explain findings in plain, human-readable language — this isn't "just prompting an LLM," it's real tooling plus AI interpretation, similar to how production tools like CodeRabbit and Sourcery work.
 
+### Security Agent — Secret & Credential Protection
+
+Beyond pairing with `bandit` for vulnerable code patterns, the Security Agent includes a dedicated, deterministic check (not left to LLM judgment) that:
+
+- Flags known-risky filenames committed in the PR — `.env`, `*.pem`, `*.key`, `id_rsa`, `credentials.json`, `service-account*.json`, etc. (`.env.example` is allowed)
+- Scans file contents/diffs for patterns that look like live secrets — AWS access keys, generic API key/token assignments, private key headers, hardcoded passwords
+- When something is found, the report is specific and actionable, e.g.: *"🚨 `.env` appears to have been committed — this likely contains live secrets. Remove it with `git rm --cached .env`, rotate any exposed keys immediately, and confirm `.env` is in `.gitignore`."*
+- Also offers lighter-touch, non-alarming recommendations (e.g. missing `.gitignore` entries, suggesting a secrets manager over hardcoded values)
+
 ---
+
+
 
 ## Tech Stack (100% Free Tools)
 
@@ -158,18 +188,22 @@ This prints a clean summary of every changed file in that PR, including old code
   }
   ```
   Tested successfully across multiple PRs of varying size.
+- ✅ `filter_python_files()` — splits fetched files into Python files (sent to agents) vs. non-Python files (skipped, but still tracked and reported)
 
 ---
 
 ## Roadmap / Next Steps
 
 - [ ] Build the 7 specialist agents (Bug-Hunter, Security, Style, Test Coverage, Documentation, Performance, Dependency)
-- [ ] Build the Coordinator Agent to merge and prioritize findings
+- [ ] Wire the Python-file filter and skipped-file tracking into `graph.py`
+- [ ] Build the Coordinator Agent to merge, prioritize findings, and report skipped files
 - [ ] Wire everything together with LangGraph
 - [ ] Expose the pipeline via a FastAPI `/review` endpoint
 - [ ] Build a Streamlit demo UI
 - [ ] Stress-test with real PRs and debug using LangSmith traces
 - [ ] Deploy and finalize documentation with architecture diagram, screenshots, and live demo link
+- [ ] **Future work:** multi-language support (ESLint for JS/TS, Semgrep for cross-language security scanning)
+- [ ] **Future work:** sequential agent communication (agents referencing each other's findings)
 
 ---
 
