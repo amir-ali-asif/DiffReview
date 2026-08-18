@@ -2,7 +2,7 @@
 
 > A multi-agent AI system that replicates a full engineering review team, giving solo developers and small startups the same level of code review rigor that only large companies with dedicated departments can normally afford.
 
-**Status:** 🚧 In active development — Day 2 of 10 complete.
+**Status:** 🚧 In active development — Day 3 of 10 complete.
 
 ---
 
@@ -20,11 +20,9 @@ This project solves that by building an AI system that acts as a full, always-av
 
 **This project currently reviews Python (`.py`) code only.**
 
-Every static analysis tool in the stack — `pylint`, `flake8`, `bandit`, `coverage.py`, `radon`, `pip-audit`, and the `ast`-based documentation check — is Python-specific. A PR that changes non-Python files (JavaScript, Java, config files, etc.) will still be fetched in full, but only the `.py` files are sent to the 6 language-specific specialist agents for review.
+Every static analysis tool planned for the specialist agents — `pylint`, `flake8`, `bandit`, `coverage.py`, `radon`, `pip-audit`, and the `ast`-based documentation check — is Python-specific. A PR that changes non-Python files will still be fetched in full, but only `.py` files are sent to the language-specific specialist agents for review. Non-Python files are explicitly filtered out and tracked (not silently dropped), so the Coordinator's final report (Day 6) will always list what was and wasn't reviewed.
 
-- Non-Python files are **not silently dropped** — they're explicitly filtered out and listed in the final Coordinator report (e.g. *"3 files skipped (not Python): App.tsx, style.css, README.md"*) so the developer always knows what was and wasn't reviewed.
-- **One exception:** the Security Agent's secret/credential-leak check (see below) runs on **every changed file regardless of language**, since a leaked API key or private key file can appear in any file type, not just Python.
-- Multi-language support (e.g. ESLint for JS/TS, Semgrep for cross-language security scanning) is a natural next step and is listed under Future Work.
+Multi-language support (e.g. ESLint for JS/TS) is a planned Future Work item, not part of the current build.
 
 ---
 
@@ -38,26 +36,21 @@ PyGithub fetches diff + old code + new code   ✅ built (Day 2)
 Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day 6)
         ↓
    ┌────────────────────────────────────────┐
-   │     7 Specialist Agents (parallel)       │  🚧 in progress (Days 3-5)
-   │  1. Bug-Hunter Agent                     │
-   │  2. Security Agent*                      │
-   │  3. Style/Readability Agent              │
-   │  4. Test Coverage Agent                  │
-   │  5. Documentation Agent                  │
-   │  6. Performance Agent                    │
-   │  7. Dependency/License Agent             │
+   │     7 Specialist Agents (parallel)       │  🚧 in progress
+   │  1. Bug-Hunter Agent                     │  ✅ built + evaluated (Day 3)
+   │  2. Security Agent                       │  ⏳ planned (Day 4)
+   │  3. Style/Readability Agent              │  ⏳ planned (Day 4)
+   │  4. Test Coverage Agent                  │  ⏳ planned (Day 4)
+   │  5. Documentation Agent                  │  ⏳ planned (Day 5)
+   │  6. Performance Agent                    │  ⏳ planned (Day 5)
+   │  7. Dependency/License Agent              │  ⏳ planned (Day 5)
    │  (each = static analysis tool + LLM,     │
    │   all traced live in LangSmith)          │
-   │                                            │
-   │  *Security Agent also scans ALL changed   │
-   │   files (any language) for secrets/keys   │
-   │   accidentally committed to the PR        │
    └────────────────┬─────────────────────────┘
                      ↓
               Coordinator Agent                  ⏳ planned (Day 6)
    (merges findings, resolves conflicts/duplicates,
-    prioritizes issues, notes skipped files,
-    writes final verdict)
+    prioritizes issues, writes final verdict)
                      ↓
          Final Report (FastAPI + Streamlit)       ⏳ planned (Days 7-8)
          + Full reasoning trace in LangSmith
@@ -65,18 +58,22 @@ Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day
 
 Each specialist agent combines the output of a **real static analysis tool** with **LLM reasoning** to explain findings in plain, human-readable language — this isn't "just prompting an LLM," it's real tooling plus AI interpretation, similar to how production tools like CodeRabbit and Sourcery work.
 
-### Security Agent — Secret & Credential Protection
-
-Beyond pairing with `bandit` for vulnerable code patterns, the Security Agent includes a dedicated, deterministic check (not left to LLM judgment) that:
-
-- Flags known-risky filenames committed in the PR — `.env`, `*.pem`, `*.key`, `id_rsa`, `credentials.json`, `service-account*.json`, etc. (`.env.example` is allowed)
-- Scans file contents/diffs for patterns that look like live secrets — AWS access keys, generic API key/token assignments, private key headers, hardcoded passwords
-- When something is found, the report is specific and actionable, e.g.: *"🚨 `.env` appears to have been committed — this likely contains live secrets. Remove it with `git rm --cached .env`, rotate any exposed keys immediately, and confirm `.env` is in `.gitignore`."*
-- Also offers lighter-touch, non-alarming recommendations (e.g. missing `.gitignore` entries, suggesting a secrets manager over hardcoded values)
-
 ---
 
+## Automated Evaluation Framework
 
+Rather than only testing agents by hand, this project includes a **fixture-based evaluation harness** (`eval_runner.py`) built once, generically, so every new agent plugs in with zero framework changes:
+
+- Each agent gets a library of test cases under `test_fixtures/<agent_name>/` — deliberately buggy/vulnerable code paired with a hand-written "expected findings" JSON file.
+- Fixtures follow a 3-case pattern: an **obvious** issue, a **subtle** issue (stress-tests whether the agent goes beyond what its paired tool flags outright), and a **clean-code control case** (tests for false positives).
+- Since an agent's report is natural language, not a clean checklist, grading uses **LLM-as-judge**: a separate, strict grading LLM call checks whether each expected finding is actually covered by the agent's report.
+- Running `python eval_runner.py <agent_name>` produces a scorecard: known issues caught (recall %) and false positives on clean code.
+
+This turns "does this agent actually work well?" from a subjective impression into a number you can track — and it's what will power a real accuracy scorecard in this README as more agents are built.
+
+**Current fixture coverage:** Bug-Hunter (3 cases: empty-list crash, mutable default argument, clean code control).
+
+---
 
 ## Tech Stack (100% Free Tools)
 
@@ -90,6 +87,7 @@ Beyond pairing with `bandit` for vulnerable code patterns, the Security Agent in
 | Backend | FastAPI |
 | Frontend | Streamlit |
 | Observability | LangSmith |
+| Evaluation | Custom fixture-based harness (LLM-as-judge) |
 | Hosting | Streamlit Community Cloud (frontend), Render / Hugging Face Spaces (backend) |
 
 ---
@@ -100,8 +98,8 @@ Beyond pairing with `bandit` for vulnerable code patterns, the Security Agent in
 |---|---|---|
 | 1 | Environment setup, accounts, folder structure | ✅ Done |
 | 2 | GitHub fetcher (diff + old + new code) | ✅ Done |
-| 3 | Bug-Hunter Agent (template for all agents) | ⏳ Next |
-| 4 | Security, Style, Test Coverage Agents | ⏳ Planned |
+| 3 | Bug-Hunter Agent + automated evaluation framework | ✅ Done |
+| 4 | Security, Style, Test Coverage Agents | ⏳ Next |
 | 5 | Documentation, Performance, Dependency Agents | ⏳ Planned |
 | 6 | Coordinator Agent + LangGraph orchestration | ⏳ Planned |
 | 7 | FastAPI backend | ⏳ Planned |
@@ -115,13 +113,18 @@ Beyond pairing with `bandit` for vulnerable code patterns, the Security Agent in
 
 ```
 multi-agent-code-review/
-├── agents/                # specialist agent modules (built Days 3-6)
-├── github_fetcher.py      # ✅ pulls PR diff + old/new code via PyGithub
-├── graph.py                # LangGraph workflow (built Day 6)
-├── app.py                  # Streamlit frontend (built Day 8)
+├── agents/
+│   ├── __init__.py
+│   └── bug_hunter.py           # ✅ Bug-Hunter agent (pylint + flake8 + LLM)
+├── test_fixtures/
+│   └── bug_hunter/             # ✅ 3 fixture cases + expected-findings JSON
+├── eval_runner.py               # ✅ automated fixture-based evaluation harness
+├── github_fetcher.py            # ✅ pulls PR diff + old/new code via PyGithub
+├── graph.py                      # LangGraph workflow (built Day 6)
+├── app.py                        # Streamlit frontend (built Day 8)
 ├── requirements.txt
-├── .env                     # your secret keys (never committed)
-├── .env.example              # safe template of required keys
+├── .env                           # your secret keys (never committed)
+├── .env.example                    # safe template of required keys
 └── .gitignore
 ```
 
@@ -159,18 +162,25 @@ You'll need free API keys from:
 - [LangSmith](https://smith.langchain.com) — tracing/observability
 - A [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope) — needed to fetch PR data
 
-### 5. Verify the setup
-```bash
-python hello_world.py
-```
-This confirms your Groq API connection and LangSmith tracing both work.
 
-### 6. Try the GitHub fetcher
-Open `github_fetcher.py`, set `TEST_PR_URL` to any real GitHub PR link, then run:
+### 5. Try the GitHub fetcher
+Set `TEST_PR_URL` in your `.env` to any real GitHub PR link, then run:
 ```bash
 python github_fetcher.py
 ```
 This prints a clean summary of every changed file in that PR, including old code, new code, and diff.
+
+### 6. Try the Bug-Hunter agent
+```bash
+python agents/bug_hunter.py
+```
+Runs pylint + flake8 on the first Python file in your test PR, then asks the LLM to turn the raw tool output into a plain-English bug report. Check [smith.langchain.com](https://smith.langchain.com) afterward to see the full reasoning trace.
+
+### 7. Run the automated evaluation suite
+```bash
+python eval_runner.py bug_hunter
+```
+Runs Bug-Hunter against its fixture library and prints a recall/false-positive scorecard.
 
 ---
 
@@ -187,15 +197,15 @@ This prints a clean summary of every changed file in that PR, including old code
       "status": "modified"
   }
   ```
-  Tested successfully across multiple PRs of varying size.
-- ✅ `filter_python_files()` — splits fetched files into Python files (sent to agents) vs. non-Python files (skipped, but still tracked and reported)
+- ✅ `filter_python_files()` — splits fetched files into Python files (sent to agents) vs. non-Python files (skipped, but tracked and reportable)
+- ✅ **Bug-Hunter Agent** — pairs `pylint` + `flake8` output with LLM reasoning to catch logic errors, runtime issues, and broken functionality; scoped strictly to that lane
+- ✅ **Automated evaluation framework** (`eval_runner.py`) — fixture-based, LLM-as-judge grading, generic enough that every future agent plugs in with zero framework changes
 
 ---
 
 ## Roadmap / Next Steps
 
-- [ ] Build the 7 specialist agents (Bug-Hunter, Security, Style, Test Coverage, Documentation, Performance, Dependency)
-- [ ] Wire the Python-file filter and skipped-file tracking into `graph.py`
+- [ ] Build the remaining 6 specialist agents (Security, Style, Test Coverage, Documentation, Performance, Dependency), each with its own fixture-based eval cases
 - [ ] Build the Coordinator Agent to merge, prioritize findings, and report skipped files
 - [ ] Wire everything together with LangGraph
 - [ ] Expose the pipeline via a FastAPI `/review` endpoint
