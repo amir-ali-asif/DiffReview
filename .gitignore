@@ -21,3 +21,7 @@ Thumbs.db
 
 #Documentation
 docs/
+
+#Evaluation
+
+eval_results/

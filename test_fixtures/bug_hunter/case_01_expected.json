@@ -1,0 +1,6 @@
+{
+  "description": "calculate_average() divides by len(numbers) with no check for an empty list, causing a ZeroDivisionError.",
+  "bugs": [
+    "Division by zero / crash when the input list is empty"
+  ]
+}

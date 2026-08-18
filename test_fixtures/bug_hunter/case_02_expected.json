@@ -1,0 +1,7 @@
+{
+  "description": "Both functions use a mutable object (list/dict) as a default argument. In Python, default arguments are evaluated once, so the SAME list/dict is shared and silently accumulates data across unrelated calls.",
+  "bugs": [
+    "Mutable default argument (cart=[]) causes state to persist and leak between separate function calls",
+    "Mutable default argument (roles={}) causes state to persist and leak between separate function calls"
+  ]
+}

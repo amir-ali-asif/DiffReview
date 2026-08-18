@@ -1,0 +1,4 @@
+{
+  "description": "This is a CONTROL case — the code is already correct (both bugs from case_02 and case_01 are fixed). No real bugs should be reported here. This case exists to test whether the agent produces FALSE POSITIVES on clean code.",
+  "bugs": []
+}
