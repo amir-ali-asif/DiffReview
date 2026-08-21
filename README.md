@@ -43,7 +43,7 @@ Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day
    │  4. Test Coverage Agent                  │  ⏳ planned (Day 4)
    │  5. Documentation Agent                  │  ⏳ planned (Day 5)
    │  6. Performance Agent                    │  ⏳ planned (Day 5)
-   │  7. Dependency/License Agent              │  ⏳ planned (Day 5)
+   │  7. Dependency/License Agent               │  ⏳ planned (Day 5)
    │  (each = static analysis tool + LLM,     │
    │   all traced live in LangSmith)          │
    └────────────────┬─────────────────────────┘
@@ -69,7 +69,16 @@ Rather than only testing agents by hand, this project includes a **fixture-based
 - Since an agent's report is natural language, not a clean checklist, grading uses **LLM-as-judge**: a separate, strict grading LLM call checks whether each expected finding is actually covered by the agent's report.
 - Running `python eval_runner.py <agent_name>` produces a scorecard: known issues caught (recall %) and false positives on clean code.
 
-This turns "does this agent actually work well?" from a subjective impression into a number you can track — and it's what will power a real accuracy scorecard in this README as more agents are built.
+**Reliability / consistency checking (`--runs`):** LLMs aren't perfectly deterministic even at `temperature=0` — the same fixture can occasionally produce a different result across runs. A recall score based on a single run tells you what happened *that one time*, not how reliable the agent actually is. `eval_runner.py` supports running each fixture case multiple times:
+
+```bash
+python eval_runner.py bug_hunter              # 1 run per case — fast, default
+python eval_runner.py bug_hunter --runs 3      # 3 runs per case — reliability check
+```
+
+Each expected finding is scored on majority vote across the runs, and any case where the runs disagreed with each other is flagged as **flaky** and printed by name. The default stays at 1 run for fast day-to-day iteration; `--runs 3` (or more) is meant for when a score is about to be quoted somewhere (README, interview) and needs to hold up statistically, not just anecdotally.
+
+This turns "does this agent actually work well?" from a subjective impression into a number you can trust — and it's what will power a real accuracy scorecard in this README as more agents are built.
 
 **Current fixture coverage:** Bug-Hunter (3 cases: empty-list crash, mutable default argument, clean code control).
 
@@ -87,7 +96,7 @@ This turns "does this agent actually work well?" from a subjective impression in
 | Backend | FastAPI |
 | Frontend | Streamlit |
 | Observability | LangSmith |
-| Evaluation | Custom fixture-based harness (LLM-as-judge) |
+| Evaluation | Custom fixture-based harness (LLM-as-judge, with multi-run reliability checking) |
 | Hosting | Streamlit Community Cloud (frontend), Render / Hugging Face Spaces (backend) |
 
 ---
@@ -118,7 +127,7 @@ multi-agent-code-review/
 │   └── bug_hunter.py           # ✅ Bug-Hunter agent (pylint + flake8 + LLM)
 ├── test_fixtures/
 │   └── bug_hunter/             # ✅ 3 fixture cases + expected-findings JSON
-├── eval_runner.py               # ✅ automated fixture-based evaluation harness
+├── eval_runner.py               # ✅ automated fixture-based evaluation harness (supports --runs)
 ├── github_fetcher.py            # ✅ pulls PR diff + old/new code via PyGithub
 ├── graph.py                      # LangGraph workflow (built Day 6)
 ├── app.py                        # Streamlit frontend (built Day 8)
@@ -151,7 +160,6 @@ pip install -r requirements.txt
 ```
 
 ### 4. Set up your environment variables
-Copy the template and fill in your own keys:
 ```bash
 cp .env.example .env
 ```
@@ -162,44 +170,36 @@ You'll need free API keys from:
 - [LangSmith](https://smith.langchain.com) — tracing/observability
 - A [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope) — needed to fetch PR data
 
+### 5. Verify the setup
+```bash
+python hello_world.py
+```
 
-### 5. Try the GitHub fetcher
-Set `TEST_PR_URL` in your `.env` to any real GitHub PR link, then run:
+### 6. Try the GitHub fetcher
 ```bash
 python github_fetcher.py
 ```
-This prints a clean summary of every changed file in that PR, including old code, new code, and diff.
 
-### 6. Try the Bug-Hunter agent
+### 7. Try the Bug-Hunter agent
 ```bash
 python agents/bug_hunter.py
 ```
-Runs pylint + flake8 on the first Python file in your test PR, then asks the LLM to turn the raw tool output into a plain-English bug report. Check [smith.langchain.com](https://smith.langchain.com) afterward to see the full reasoning trace.
 
-### 7. Run the automated evaluation suite
+### 8. Run the automated evaluation suite
 ```bash
-python eval_runner.py bug_hunter
+python eval_runner.py bug_hunter                # quick check, 1 run per case
+python eval_runner.py bug_hunter --runs 3        # reliability check, 3 runs per case
 ```
-Runs Bug-Hunter against its fixture library and prints a recall/false-positive scorecard.
 
 ---
 
 ## What's Working So Far
 
 - ✅ Full local dev environment with Groq + Gemini + LangSmith wired up and verified
-- ✅ `github_fetcher.py` — given any PR link, returns a structured `file_context` object per changed file:
-  ```python
-  {
-      "filename": "balance.py",
-      "old_code": "...",
-      "new_code": "...",
-      "diff": "...",
-      "status": "modified"
-  }
-  ```
-- ✅ `filter_python_files()` — splits fetched files into Python files (sent to agents) vs. non-Python files (skipped, but tracked and reportable)
-- ✅ **Bug-Hunter Agent** — pairs `pylint` + `flake8` output with LLM reasoning to catch logic errors, runtime issues, and broken functionality; scoped strictly to that lane
-- ✅ **Automated evaluation framework** (`eval_runner.py`) — fixture-based, LLM-as-judge grading, generic enough that every future agent plugs in with zero framework changes
+- ✅ `github_fetcher.py` — returns a structured `file_context` object per changed file
+- ✅ `filter_python_files()` — splits fetched files into Python vs. non-Python (skipped, but tracked)
+- ✅ **Bug-Hunter Agent** — pairs `pylint` + `flake8` output with LLM reasoning, scoped strictly to logic/runtime issues
+- ✅ **Automated evaluation framework** (`eval_runner.py`) — fixture-based, LLM-as-judge grading, with multi-run reliability/consistency checking via `--runs`, generic enough that every future agent plugs in with zero framework changes
 
 ---
 
