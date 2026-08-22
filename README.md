@@ -118,7 +118,7 @@ Each expected finding is scored on majority vote across the runs, and any case w
 | Evaluation | Custom fixture-based harness (LLM-as-judge, with multi-run reliability checking) |
 | Hosting | Streamlit Community Cloud (frontend), Render / Hugging Face Spaces (backend) |
 
-> **Note:** Groq deprecated `llama-3.3-70b-versatile` (decommissioned August 16, 2026). All agents now use `openai/gpt-oss-120b`, Groq's recommended free-tier replacement.
+> **Note:** All agents are using `openai/gpt-oss-120b`, Groq's free-tier model.
 
 ---
 
