@@ -1,0 +1,6 @@
+{
+  "description": "get_user_by_name() builds a SQL query with string concatenation instead of parameters, allowing SQL injection via the username input.",
+  "vulnerabilities": [
+    "SQL injection vulnerability from building a query with string concatenation instead of parameterized queries"
+  ]
+}

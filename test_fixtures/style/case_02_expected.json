@@ -1,0 +1,6 @@
+{
+  "description": "This code is syntactically valid and would pass black/naming checks — the issue is purely a readability/maintainability one (5 levels of nested if/else). This is the SUBTLE case: it stress-tests whether the agent goes beyond obvious formatting into genuine refactor-worthy structure, not just what black or naming checks would catch.",
+  "style_issues": [
+    "Deeply nested if/else chain (5 levels) hurts readability; could be refactored with early returns / guard clauses"
+  ]
+}

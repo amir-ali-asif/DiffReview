@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — divide() is fully tested including the zero-division edge case and negative numbers. Tests whether the agent stays quiet instead of inventing gaps.",
+  "coverage_gaps": []
+}

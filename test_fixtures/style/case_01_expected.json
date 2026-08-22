@@ -1,0 +1,7 @@
+{
+  "description": "calculateTotal and userAccount don't follow Python naming conventions (should be snake_case for functions, PascalCase is fine for classes but 'userAccount' should be 'UserAccount'), and formatting is missing standard spacing around operators/commas.",
+  "style_issues": [
+    "Function/class names not following Python naming conventions (calculateTotal, userAccount)",
+    "Missing spaces around operators and after commas, inconsistent with PEP 8 formatting"
+  ]
+}

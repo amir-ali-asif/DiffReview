@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — PEP 8-compliant naming and formatting throughout, with docstrings. Tests whether the agent stays quiet instead of inventing style nitpicks.",
+  "style_issues": []
+}

@@ -323,12 +323,20 @@ if __name__ == "__main__":
     sys.path.append(project_root)
 
     from agents.bug_hunter import run_bug_hunter
+    from agents.security import run_security
+    from agents.style import run_style
+    from agents.test_coverage import run_test_coverage
 
     # --- AGENT_REGISTRY ---
-    # All 7 specialist agents are now registered — Day 5 completes the set.
+    # Add one line here per agent as you build them (Day 5 still needs
+    # documentation, performance, and dependency).
     AGENT_REGISTRY = {
-        "bug_hunter": run_bug_hunter
+        "bug_hunter": run_bug_hunter,
+        "security": run_security,
+        "style": run_style,
+        "test_coverage": run_test_coverage,
     }
+
 
     requested = None
     runs = 1

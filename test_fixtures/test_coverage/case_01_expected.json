@@ -1,0 +1,6 @@
+{
+  "description": "divide() has no test function anywhere in this file.",
+  "coverage_gaps": [
+    "No test function exists for divide() anywhere in this file"
+  ]
+}

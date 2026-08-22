@@ -1,0 +1,6 @@
+{
+  "description": "fetch_weather() has a live-looking API key hardcoded directly in source code instead of loaded from an environment variable or secrets manager. This is a subtler case than case_01 — a plain linter like bandit may not flag this by default, so it tests whether the dedicated secret-content regex scan catches it.",
+  "vulnerabilities": [
+    "Hardcoded API key committed directly in source code instead of loaded from environment variables/secrets manager"
+  ]
+}

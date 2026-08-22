@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — parameterized SQL query, API key loaded from environment (not hardcoded), no sensitive filenames. Tests whether the agent stays quiet on genuinely secure code instead of inventing findings.",
+  "vulnerabilities": []
+}

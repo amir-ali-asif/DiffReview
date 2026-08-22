@@ -33,8 +33,7 @@ load_dotenv()
 
 # One shared LLM connection for this agent.
 # temperature=0 keeps findings consistent/repeatable rather than creative.
-llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0)
-
+llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
 
 def run_pylint(code: str) -> str:
     """

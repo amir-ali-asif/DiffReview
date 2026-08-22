@@ -1,0 +1,6 @@
+{
+  "description": "A .env file was accidentally committed to the PR, containing what look like live secrets (an API key and a database password). This directly tests the 'important security file pushed by mistake' detection requirement — the agent should flag this by FILENAME alone, and reinforce it via the content scan.",
+  "vulnerabilities": [
+    "A .env file containing live-looking secrets (API key, database password) was committed to the repository and must be removed and the keys rotated"
+  ]
+}

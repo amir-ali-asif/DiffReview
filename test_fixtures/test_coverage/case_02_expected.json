@@ -1,0 +1,6 @@
+{
+  "description": "A test exists (so the naive 'is there a test?' check passes), but it only covers the normal case. This is the SUBTLE case — it stress-tests whether the agent reasons about edge-case coverage, not just test presence/absence.",
+  "coverage_gaps": [
+    "Existing test only covers the normal case; missing a test for division by zero (b=0), which will raise ZeroDivisionError"
+  ]
+}
