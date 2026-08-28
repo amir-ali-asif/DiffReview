@@ -139,24 +139,31 @@ def filter_python_files(file_contexts):
     """
     Splits the full list of changed files into two groups:
 
-      - python_files:  files ending in .py — these go to the 7 specialist
-                        agents (Bug-Hunter, Style, Test Coverage, etc.)
-      - skipped_files:  everything else (filenames only) — these do NOT
-                        get sent to the Python-based static analysis agents
+      - python_files:  files ending in .py — these go to the 5 Python-only
+                        specialist agents (Bug-Hunter, Style, Test Coverage,
+                        Documentation, Performance)
+      - skipped_files:  everything else — full file_context dicts (NOT just
+                        filenames) for files that aren't Python
+
+    DAY 6 UPDATE: skipped_files now holds the full file_context dict for
+    each skipped file, not just its filename string. Back on Day 2 this
+    only needed to hold filenames, for reporting purposes ("3 files
+    skipped: App.tsx, ..."). But graph.py (Day 6) needs to actually RUN
+    two agents on some of these skipped files:
+      - security_node runs its secret/credential-leak scan on every file,
+        regardless of language.
+      - dependency_node runs pip-audit on any file that's a dependency
+        manifest (requirements.txt, Pipfile, etc.) — none of which are
+        .py files, so they always land in "skipped" too.
+    Both agents need the FULL file_context (filename + content), not just
+    a filename string, to actually do their job. If you only need the
+    filenames for a report, use: [fc["filename"] for fc in skipped_files]
 
     Why keep a "skipped" list instead of just deleting non-Python files:
     Silently dropping files with no explanation looks like a bug, not a
-    feature. Keeping the filenames lets the Coordinator's final report say
-    something like:
-        "3 files skipped (not Python): App.tsx, style.css, README.md"
-    so the developer understands why those files weren't reviewed, instead
-    of wondering if the tool missed them.
-
-    Note: the Security Agent's secret/credential-leak check (e.g. finding
-    a committed .env or .pem file) is the one exception — that check runs
-    on ALL files, including the skipped ones, since secrets can appear in
-    any file type. That check should receive the full, unfiltered
-    file_contexts list separately, not just python_files.
+    feature. The Coordinator's final report can say something like:
+        "3 files skipped by the Python-only agents: App.tsx, style.css"
+    so the developer understands why those files weren't fully reviewed.
     """
     python_files = []
     skipped_files = []
@@ -165,7 +172,7 @@ def filter_python_files(file_contexts):
         if fc["filename"].endswith(PYTHON_EXTENSIONS):
             python_files.append(fc)
         else:
-            skipped_files.append(fc["filename"])
+            skipped_files.append(fc)
 
     return python_files, skipped_files
 
@@ -205,9 +212,10 @@ if __name__ == "__main__":
         print("--- Full file_context for first changed file ---")
         print(contexts[0])
 
-    # Preview of the Day 6 filtering step (not wired into the pipeline yet,
-    # just demonstrated here so you can see it working on real PR data).
+    # Preview of the Day 6 filtering step, now returning full file_context
+    # dicts for skipped files (not just filenames) so agents can act on them.
     python_files, skipped_files = filter_python_files(contexts)
-    print(f"\n{len(python_files)} Python file(s) would go to the agents.")
+    print(f"\n{len(python_files)} Python file(s) would go to the Python-only agents.")
     if skipped_files:
-        print(f"{len(skipped_files)} file(s) would be skipped (not Python): {skipped_files}")
+        skipped_filenames = [fc["filename"] for fc in skipped_files]
+        print(f"{len(skipped_files)} file(s) skipped by Python-only agents: {skipped_filenames}")

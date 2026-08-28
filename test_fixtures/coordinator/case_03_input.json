@@ -1,0 +1,27 @@
+{
+  "description": "Every specialist agent reported NO issues for this file. The Coordinator should write a final verdict that clearly says the code looks fine and recommends approval — it must NOT invent findings just to seem thorough.",
+  "check_type": "no_hallucination",
+  "agent_reports": [
+    {
+      "agent": "bug_hunter",
+      "filename": "utils.py",
+      "report": "No bugs found. The logic is correct and handles edge cases appropriately."
+    },
+    {
+      "agent": "security",
+      "filename": "utils.py",
+      "report": "No security issues found. No sensitive files or secrets detected."
+    },
+    {
+      "agent": "style",
+      "filename": "utils.py",
+      "report": "No style issues found. Naming and formatting follow PEP 8."
+    },
+    {
+      "agent": "test_coverage",
+      "filename": "utils.py",
+      "report": "Test coverage looks adequate; all functions have corresponding tests covering normal and edge cases."
+    }
+  ],
+  "skipped_filenames": []
+}

@@ -1,0 +1,23 @@
+{
+  "description": "Reports are deliberately given to the Coordinator in the WRONG order (Minor first, Critical last) to test whether it correctly REORDERS them by real severity in its final verdict, rather than just repeating the input order.",
+  "check_type": "severity_order",
+  "expected_order": ["Critical", "Major", "Minor"],
+  "agent_reports": [
+    {
+      "agent": "style",
+      "filename": "payments.py",
+      "report": "MINOR: variable name 'x' is not descriptive, consider renaming to 'transaction_amount'."
+    },
+    {
+      "agent": "test_coverage",
+      "filename": "payments.py",
+      "report": "MAJOR: process_refund() has no test coverage for the case where the refund amount exceeds the original charge."
+    },
+    {
+      "agent": "security",
+      "filename": "payments.py",
+      "report": "CRITICAL: API key for the payment provider is hardcoded directly in this file instead of loaded from environment variables."
+    }
+  ],
+  "skipped_filenames": []
+}

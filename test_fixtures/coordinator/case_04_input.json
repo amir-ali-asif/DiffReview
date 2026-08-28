@@ -1,0 +1,12 @@
+{
+  "description": "One real finding exists, plus two non-Python files were skipped by the Python-only agents. The Coordinator should mention the skipped files as a plain transparency note at the end, WITHOUT treating them as a bug, issue, or severity finding.",
+  "check_type": "skipped_files_note",
+  "agent_reports": [
+    {
+      "agent": "bug_hunter",
+      "filename": "calculator.py",
+      "report": "MAJOR: divide() does not handle division by zero and will raise an unhandled ZeroDivisionError."
+    }
+  ],
+  "skipped_filenames": ["App.tsx", "styles.css"]
+}

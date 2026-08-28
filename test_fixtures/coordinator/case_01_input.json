@@ -1,0 +1,23 @@
+{
+  "description": "Security and Bug-Hunter both describe the SAME underlying SQL injection issue in auth.py, in different words. A Style agent also flags an unrelated minor naming issue. The Coordinator should merge the SQL injection finding into ONE item, not list it twice.",
+  "check_type": "dedup",
+  "duplicate_topic": "SQL injection vulnerability in login()",
+  "agent_reports": [
+    {
+      "agent": "security",
+      "filename": "auth.py",
+      "report": "CRITICAL: SQL injection vulnerability in login() due to unsanitized string concatenation in the query. Fix: use parameterized queries."
+    },
+    {
+      "agent": "bug_hunter",
+      "filename": "auth.py",
+      "report": "MAJOR: login() builds a SQL query by concatenating user input directly, which can also cause unexpected query errors on special characters, not just a security risk."
+    },
+    {
+      "agent": "style",
+      "filename": "auth.py",
+      "report": "MINOR: function name 'login' could be more descriptive, e.g. 'authenticate_user'."
+    }
+  ],
+  "skipped_filenames": []
+}
