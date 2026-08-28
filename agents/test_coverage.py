@@ -40,12 +40,12 @@ import subprocess
 import tempfile
 
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from llm_client import invoke_with_fallback
 from langchain_core.messages import SystemMessage, HumanMessage
 
 load_dotenv()
 
-llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
+
 
 def find_untested_functions(code: str):
     """
@@ -165,7 +165,7 @@ def run_test_coverage(file_context: dict) -> dict:
 
     print("[Test Coverage] Asking the LLM to interpret the findings...")
     messages = build_prompt(file_context, untested_functions, coverage_output)
-    response = llm.invoke(messages)
+    response = invoke_with_fallback(messages)
 
     return {
         "agent": "test_coverage",

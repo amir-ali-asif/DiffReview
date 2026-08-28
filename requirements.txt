@@ -11,6 +11,7 @@ pygithub
 fastapi
 uvicorn
 streamlit
+requests
 
 # --- Static analysis tools (used by specialist agents) ---
 pylint
@@ -25,3 +26,4 @@ pytest
 # --- Utilities ---
 python-dotenv
 google-generativeai
+langchain-google-genai

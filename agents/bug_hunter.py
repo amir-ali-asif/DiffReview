@@ -26,14 +26,11 @@ import subprocess
 import tempfile
 
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from llm_client import invoke_with_fallback
 from langchain_core.messages import SystemMessage, HumanMessage
 
 load_dotenv()
 
-# One shared LLM connection for this agent.
-# temperature=0 keeps findings consistent/repeatable rather than creative.
-llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
 
 def run_pylint(code: str) -> str:
     """
@@ -160,7 +157,7 @@ def run_bug_hunter(file_context: dict) -> dict:
 
     print("[Bug-Hunter] Asking the LLM to interpret the findings...")
     messages = build_prompt(file_context, pylint_output, flake8_output)
-    response = llm.invoke(messages)
+    response = invoke_with_fallback(messages)
 
     return {
         "agent": "bug_hunter",

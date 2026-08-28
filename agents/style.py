@@ -24,12 +24,12 @@ import subprocess
 import tempfile
 
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from llm_client import invoke_with_fallback
 from langchain_core.messages import SystemMessage, HumanMessage
 
 load_dotenv()
 
-llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
+
 
 def run_pylint_style(code: str) -> str:
     """Runs pylint with ONLY convention (C) and refactor (R) checks enabled."""
@@ -122,7 +122,7 @@ def run_style(file_context: dict) -> dict:
 
     print("[Style] Asking the LLM to interpret the findings...")
     messages = build_prompt(file_context, pylint_output, black_output)
-    response = llm.invoke(messages)
+    response = invoke_with_fallback(messages)
 
     return {
         "agent": "style",

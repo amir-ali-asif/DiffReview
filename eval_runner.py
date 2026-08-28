@@ -65,7 +65,7 @@ FIXTURES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_f
 # A separate, cheap, low-temperature model call used ONLY to grade reports.
 # Kept separate from the agents' own LLM calls so grading logic stays in
 # one place and doesn't get mixed into agent prompts.
-judge_llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+judge_llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
 
 
 # ---------------------------------------------------------------------

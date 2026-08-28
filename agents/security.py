@@ -27,12 +27,12 @@ import subprocess
 import tempfile
 
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from llm_client import invoke_with_fallback
 from langchain_core.messages import SystemMessage, HumanMessage
 
 load_dotenv()
 
-llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0)
+
 
 # ---------------------------------------------------------------------
 # Deterministic secret / sensitive-file detection (no LLM involved)
@@ -205,7 +205,7 @@ def run_security(file_context: dict) -> dict:
 
     print("[Security] Asking the LLM to interpret the findings...")
     messages = build_prompt(file_context, bandit_output, filename_warning, secret_findings)
-    response = llm.invoke(messages)
+    response = invoke_with_fallback(messages)
 
     return {
         "agent": "security",
