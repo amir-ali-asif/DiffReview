@@ -1,0 +1,7 @@
+{
+  "description": "Neither dependency has a specific safe version pinned — 'requests' has no version at all, and 'flask>=1.0' allows resolving to very old, potentially vulnerable versions. pip-audit itself may not flag a concrete CVE here since there's no specific installed version to check against, so this stress-tests whether the agent reasons about PINNING RISK beyond raw pip-audit output, per its system prompt instructions.",
+  "dependency_issues": [
+    "requests has no version pin at all, risking silent resolution to a vulnerable version in the future",
+    "flask>=1.0 allows resolving to very old versions with known vulnerabilities; should be pinned to a specific safe version"
+  ]
+}

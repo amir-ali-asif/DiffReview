@@ -1,0 +1,6 @@
+{
+  "description": "has_duplicates() uses a nested loop comparing every pair of elements, giving O(n^2) time complexity. radon's complexity score should also flag this structurally (nested loops raise cyclomatic complexity).",
+  "performance_issues": [
+    "Nested loop comparing every pair of elements results in O(n^2) time complexity; could be solved in O(n) using a set to track seen items"
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — full, useful docstrings throughout including Args/Returns. Tests whether the agent stays quiet instead of inventing documentation nitpicks.",
+  "doc_issues": []
+}

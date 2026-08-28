@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — both dependencies are pinned to specific, currently-safe versions. Tests whether the agent stays quiet instead of inventing issues. NOTE: this check uses LIVE vulnerability data via pip-audit — if a new CVE is disclosed for these exact versions after this fixture was written, that's expected, correct behavior, not a bug. This is exactly why periodically re-running the eval suite matters, not just running it once.",
+  "dependency_issues": []
+}

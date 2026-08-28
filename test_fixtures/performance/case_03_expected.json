@@ -1,0 +1,4 @@
+{
+  "description": "CONTROL case — both functions use efficient O(n) approaches (set for dedup, list + join for string building). Tests whether the agent stays quiet instead of inventing performance issues.",
+  "performance_issues": []
+}

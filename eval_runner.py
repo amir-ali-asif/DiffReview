@@ -65,7 +65,7 @@ FIXTURES_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_f
 # A separate, cheap, low-temperature model call used ONLY to grade reports.
 # Kept separate from the agents' own LLM calls so grading logic stays in
 # one place and doesn't get mixed into agent prompts.
-judge_llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0)
+judge_llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
 
 # ---------------------------------------------------------------------
@@ -326,17 +326,21 @@ if __name__ == "__main__":
     from agents.security import run_security
     from agents.style import run_style
     from agents.test_coverage import run_test_coverage
+    from agents.documentation import run_documentation
+    from agents.performance import run_performance
+    from agents.dependency import run_dependency
 
     # --- AGENT_REGISTRY ---
-    # Add one line here per agent as you build them (Day 5 still needs
-    # documentation, performance, and dependency).
+    # All 7 specialist agents are now registered — Day 5 completes the set.
     AGENT_REGISTRY = {
         "bug_hunter": run_bug_hunter,
         "security": run_security,
         "style": run_style,
         "test_coverage": run_test_coverage,
+        "documentation": run_documentation,
+        "performance": run_performance,
+        "dependency": run_dependency,
     }
-
 
     requested = None
     runs = 1

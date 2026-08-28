@@ -1,0 +1,7 @@
+{
+  "description": "Both functions technically HAVE a docstring, so a naive 'is a docstring present?' check would pass — but the docstrings are too short/uninformative to actually help a reader. This is the SUBTLE case, stress-testing whether the agent judges docstring QUALITY, not just presence.",
+  "doc_issues": [
+    "calculate_discount() docstring is too thin/uninformative ('price.')",
+    "apply_tax() docstring is too thin/uninformative ('Tax.')"
+  ]
+}

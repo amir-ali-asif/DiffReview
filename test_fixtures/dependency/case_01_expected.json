@@ -1,0 +1,6 @@
+{
+  "description": "PyYAML 5.1 has a known vulnerability (unsafe deserialization) fixed in later versions. pip-audit should flag this directly by querying live vulnerability data.",
+  "dependency_issues": [
+    "PyYAML 5.1 has a known vulnerability; upgrade to 5.4 or later"
+  ]
+}

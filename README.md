@@ -2,7 +2,7 @@
 
 > A multi-agent AI system that replicates a full engineering review team, giving solo developers and small startups the same level of code review rigor that only large companies with dedicated departments can normally afford.
 
-**Status:** 🚧 In active development — Day 4 of 10 complete.
+**Status:** 🚧 In active development — Day 5 of 10 complete. All 7 specialist agents built and evaluated.
 
 ---
 
@@ -20,9 +20,13 @@ This project solves that by building an AI system that acts as a full, always-av
 
 **This project currently reviews Python (`.py`) code only.**
 
-Every static analysis tool used by the specialist agents — `pylint`, `flake8`, `bandit`, `coverage.py`, `radon`, `pip-audit`, and the `ast`-based documentation check (Day 5) — is Python-specific. A PR that changes non-Python files will still be fetched in full, but only `.py` files are sent to the language-specific specialist agents for review. Non-Python files are explicitly filtered out and tracked (not silently dropped), so the Coordinator's final report (Day 6) will always list what was and wasn't reviewed.
+Every static analysis tool used by the specialist agents — `pylint`, `flake8`, `bandit`, `coverage.py`, `black`, `radon`, `pip-audit`, and the `ast`-based documentation check — is Python-specific. A PR that changes non-Python files will still be fetched in full, but only `.py` files are sent to the language-specific specialist agents for review. Non-Python files are explicitly filtered out and tracked (not silently dropped), so the Coordinator's final report (Day 6) will always list what was and wasn't reviewed.
 
-**One deliberate exception:** the Security agent's secret/credential-leak check runs on **every file, regardless of language** — a leaked API key or a committed `.env` file doesn't care what language the surrounding project is written in.
+**Two deliberate, documented exceptions to the Python-only filter:**
+- The **Security agent's** secret/credential-leak check runs on **every file, regardless of language** — a leaked API key or a committed `.env` file doesn't care what language the surrounding project is written in.
+- The **Dependency agent** only makes sense on dependency manifest files (`requirements.txt`, `Pipfile`, `pyproject.toml`) — none of which are `.py` files either, so it needs its own routing rule alongside Security's.
+
+**One more honest, documented limitation:** the Test Coverage agent can only see the single changed file it's given, not the project's full test suite (which usually lives in separate files). It's scoped to reason about what's visible in-file, phrased with appropriate humility rather than false certainty — see `agents/test_coverage.py` for the full explanation.
 
 Multi-language support (e.g. ESLint for JS/TS) is a planned Future Work item, not part of the current build.
 
@@ -38,20 +42,21 @@ PyGithub fetches diff + old code + new code   ✅ built (Day 2)
 Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day 6)
         ↓
    ┌────────────────────────────────────────┐
-   │     7 Specialist Agents (parallel)       │  🚧 in progress
-   │  1. Bug-Hunter Agent                     │  ✅ built + evaluated (Day 3)
-   │  2. Security Agent*                      │  ✅ built + evaluated (Day 4)
-   │  3. Style/Readability Agent              │  ✅ built + evaluated (Day 4)
-   │  4. Test Coverage Agent                  │  ✅ built + evaluated (Day 4)
-   │  5. Documentation Agent                  │  ⏳ planned (Day 5)
-   │  6. Performance Agent                    │  ⏳ planned (Day 5)
-   │  7. Dependency/License Agent               │  ⏳ planned (Day 5)
+   │   7 Specialist Agents (parallel)         │  ✅ ALL BUILT + EVALUATED
+   │  1. Bug-Hunter Agent                     │  ✅ Day 3
+   │  2. Security Agent*                      │  ✅ Day 4
+   │  3. Style/Readability Agent              │  ✅ Day 4
+   │  4. Test Coverage Agent                  │  ✅ Day 4
+   │  5. Documentation Agent                  │  ✅ Day 5
+   │  6. Performance Agent                    │  ✅ Day 5
+   │  7. Dependency/License Agent†             │  ✅ Day 5
    │  (each = static analysis tool + LLM,     │
    │   all traced live in LangSmith)          │
    │                                            │
-   │  *Security Agent also scans ALL changed   │
-   │   files (any language) for secrets/keys   │
-   │   accidentally committed to the PR        │
+   │  *Security also scans ALL changed files   │
+   │   (any language) for secrets/keys         │
+   │  †Dependency only runs on manifest files   │
+   │   (requirements.txt, Pipfile, etc.)        │
    └────────────────┬─────────────────────────┘
                      ↓
               Coordinator Agent                  ⏳ planned (Day 6)
@@ -65,6 +70,19 @@ Filter: Python files → agents | non-Python → skipped list   ⏳ planned (Day
 
 Each specialist agent combines the output of a **real static analysis tool** with **LLM reasoning** to explain findings in plain, human-readable language — this isn't "just prompting an LLM," it's real tooling plus AI interpretation, similar to how production tools like CodeRabbit and Sourcery work.
 
+### The 7 Agents at a Glance
+
+| # | Agent | Paired Tool | Notable design decision |
+|---|---|---|---|
+| 1 | Bug-Hunter | `pylint` + `flake8` | Template agent — the tool→LLM pattern every other agent reuses |
+| 2 | Security | `bandit` + custom secret scanner | Deterministic (non-LLM) detection for leaked credentials — too important to leave to model judgment |
+| 3 | Style/Readability | `pylint` (convention/refactor only) + `black --check` | Scoped tool flags to avoid duplicating Bug-Hunter's findings |
+| 4 | Test Coverage | `ast` heuristic + self-contained `pytest`/`coverage.py` | Honest scope limitation: can't see tests in separate files, phrased accordingly |
+| 5 | Documentation | Custom `ast`-based docstring analysis | Only agent with no external CLI tool — checks both missing AND low-quality docstrings |
+| 6 | Performance | `radon` (complexity + maintainability) | LLM explicitly told to reason beyond radon's structural score (catches things like O(n²) string concatenation that "looks" simple) |
+| 7 | Dependency/License | `pip-audit` | Only agent scoped to manifest files; also flags unpinned dependencies pip-audit itself won't catch |
+| — | Coordinator | — | Merges all 7 reports, dedupes, prioritizes — planned for Day 6 |
+
 ### Security Agent — Secret & Credential Protection
 
 Beyond pairing with `bandit` for vulnerable code patterns, the Security agent includes a dedicated, **deterministic** check (not left to LLM judgment) that:
@@ -77,22 +95,14 @@ Beyond pairing with `bandit` for vulnerable code patterns, the Security agent in
 
 ## Automated Evaluation Framework
 
-Rather than only testing agents by hand, this project includes a **fixture-based evaluation harness** (`eval_runner.py`) built once, generically, so every new agent plugs in with zero framework changes:
+Rather than only testing agents by hand, this project includes a **fixture-based evaluation harness** (`eval_runner.py`) built once, generically, so every agent plugs in with zero framework changes — proven out now across all 7 agents:
 
-- Each agent gets a library of test cases under `test_fixtures/<agent_name>/` — deliberately buggy/vulnerable code paired with a hand-written "expected findings" JSON file.
-- Fixtures generally follow a 3-case pattern: an **obvious** issue, a **subtle** issue (stress-tests whether the agent goes beyond what its paired tool flags outright), and a **clean-code control case** (tests for false positives). The Security agent gets a 4th case specifically for the leaked-`.env`-file scenario.
+- Each agent has a library of test cases under `test_fixtures/<agent_name>/` — deliberately buggy/vulnerable code paired with a hand-written "expected findings" JSON file.
+- Fixtures generally follow a 3-case pattern: an **obvious** issue, a **subtle** issue (stress-tests whether the agent goes beyond what its paired tool flags outright), and a **clean-code control case** (tests for false positives). Security gets a 4th case for the leaked-`.env`-file scenario.
 - Since an agent's report is natural language, not a clean checklist, grading uses **LLM-as-judge**: a separate, strict grading LLM call checks whether each expected finding is actually covered by the agent's report.
-- Running `python eval_runner.py <agent_name>` produces a scorecard: known issues caught (recall %) and false positives on clean code. Running `python eval_runner.py` with no argument runs every registered agent at once.
+- Running `python eval_runner.py <agent_name>` produces a scorecard: known issues caught (recall %) and false positives on clean code. Running `python eval_runner.py` with no argument runs **all 7 agents** in one command.
 
-**Reliability / consistency checking (`--runs`):** LLMs aren't perfectly deterministic even at `temperature=0` — the same fixture can occasionally produce a different result across runs. A recall score based on a single run tells you what happened *that one time*, not how reliable the agent actually is. `eval_runner.py` supports running each fixture case multiple times:
-
-```bash
-python eval_runner.py security --runs 3
-```
-
-Each expected finding is scored on majority vote across the runs, and any case where the runs disagreed with each other is flagged as **flaky** and printed by name. The default stays at 1 run for fast day-to-day iteration; `--runs 3` (or more) is meant for when a score is about to be quoted somewhere (README, interview) and needs to hold up statistically, not just anecdotally.
-
-**Current fixture coverage (4 agents, 13 cases):**
+**Full fixture coverage (7 agents, 22 cases):**
 
 | Agent | Cases | What's tested |
 |---|---|---|
@@ -100,6 +110,11 @@ Each expected finding is scored on majority vote across the runs, and any case w
 | Security | 4 | SQL injection, hardcoded API key, leaked `.env` file, secure code control |
 | Style | 3 | Bad naming/formatting, deep nesting, clean PEP8 control |
 | Test Coverage | 3 | No tests, incomplete edge-case tests, fully tested control |
+| Documentation | 3 | Missing docstrings, thin/low-value docstrings, well-documented control |
+| Performance | 3 | O(n²) nested loop, string-concat-in-loop, efficient code control |
+| Dependency | 3 | Known-vulnerable pinned package, unpinned dependencies, safely pinned control |
+
+A single `python eval_runner.py` run now produces 7 scorecards — a real, evidence-backed accuracy claim for every agent in the system, not just a subjective "it seemed to work."
 
 ---
 
@@ -108,17 +123,15 @@ Each expected finding is scored on majority vote across the runs, and any case w
 | Layer | Tool |
 |---|---|
 | Agent Orchestration | LangGraph |
-| LLM | Groq API (`openai/gpt-oss-120b`), Gemini API as fallback |
+| LLM | Groq API (Llama 3.3 70B), Gemini API as fallback |
 | Code Parsing | Python `ast` module |
 | PR Fetching | PyGithub |
 | Static Analysis | `pylint`, `flake8`, `bandit`, `coverage.py`, `black`, `pytest`, `radon`, `pip-audit` |
 | Backend | FastAPI |
 | Frontend | Streamlit |
 | Observability | LangSmith |
-| Evaluation | Custom fixture-based harness (LLM-as-judge, with multi-run reliability checking) |
+| Evaluation | Custom fixture-based harness (LLM-as-judge) |
 | Hosting | Streamlit Community Cloud (frontend), Render / Hugging Face Spaces (backend) |
-
-> **Note:** All agents are using `openai/gpt-oss-120b`, Groq's free-tier model.
 
 ---
 
@@ -130,8 +143,8 @@ Each expected finding is scored on majority vote across the runs, and any case w
 | 2 | GitHub fetcher (diff + old + new code) | ✅ Done |
 | 3 | Bug-Hunter Agent + automated evaluation framework | ✅ Done |
 | 4 | Security, Style, Test Coverage Agents | ✅ Done |
-| 5 | Documentation, Performance, Dependency Agents | ⏳ Next |
-| 6 | Coordinator Agent + LangGraph orchestration | ⏳ Planned |
+| 5 | Documentation, Performance, Dependency Agents — all 7 agents complete | ✅ Done |
+| 6 | Coordinator Agent + LangGraph orchestration | ⏳ Next |
 | 7 | FastAPI backend | ⏳ Planned |
 | 8 | Streamlit frontend | ⏳ Planned |
 | 9 | Testing, debugging via LangSmith | ⏳ Planned |
@@ -148,19 +161,25 @@ multi-agent-code-review/
 │   ├── bug_hunter.py            # ✅ pylint + flake8 + LLM
 │   ├── security.py               # ✅ bandit + secret/credential-leak scan + LLM
 │   ├── style.py                   # ✅ pylint (convention/refactor) + black --check + LLM
-│   └── test_coverage.py           # ✅ ast heuristic + self-contained coverage.py + LLM
+│   ├── test_coverage.py            # ✅ ast heuristic + self-contained coverage.py + LLM
+│   ├── documentation.py             # ✅ custom ast-based docstring analysis + LLM
+│   ├── performance.py                # ✅ radon (complexity + maintainability) + LLM
+│   └── dependency.py                  # ✅ pip-audit + LLM (manifest files only)
 ├── test_fixtures/
-│   ├── bug_hunter/                # ✅ 3 fixture cases
-│   ├── security/                   # ✅ 4 fixture cases (incl. leaked .env)
-│   ├── style/                       # ✅ 3 fixture cases
-│   └── test_coverage/                # ✅ 3 fixture cases
-├── eval_runner.py                     # ✅ automated fixture-based evaluation harness (supports --runs)
-├── github_fetcher.py                   # ✅ pulls PR diff + old/new code via PyGithub
-├── graph.py                              # LangGraph workflow (built Day 6)
-├── app.py                                  # Streamlit frontend (built Day 8)
+│   ├── bug_hunter/                     # ✅ 3 fixture cases
+│   ├── security/                        # ✅ 4 fixture cases (incl. leaked .env)
+│   ├── style/                            # ✅ 3 fixture cases
+│   ├── test_coverage/                     # ✅ 3 fixture cases
+│   ├── documentation/                      # ✅ 3 fixture cases
+│   ├── performance/                         # ✅ 3 fixture cases
+│   └── dependency/                           # ✅ 3 fixture cases
+├── eval_runner.py                              # ✅ evaluates all 7 agents, one command
+├── github_fetcher.py                            # ✅ pulls PR diff + old/new code via PyGithub
+├── graph.py                                       # LangGraph workflow (built Day 6)
+├── app.py                                           # Streamlit frontend (built Day 8)
 ├── requirements.txt
-├── .env                                     # your secret keys (never committed)
-├── .env.example                              # safe template of required keys
+├── .env                                               # your secret keys (never committed)
+├── .env.example                                         # safe template of required keys
 └── .gitignore
 ```
 
@@ -216,14 +235,16 @@ python agents/bug_hunter.py
 python agents/security.py
 python agents/style.py
 python agents/test_coverage.py
+python agents/documentation.py
+python agents/performance.py
+python agents/dependency.py
 ```
-Each prints a plain-English findings report for the first Python file in your test PR. Check [smith.langchain.com](https://smith.langchain.com) afterward to see the full reasoning trace for any run.
+Each prints a plain-English findings report for the first Python file (or, for Dependency, first manifest file) in your test PR. Check [smith.langchain.com](https://smith.langchain.com) afterward to see the full reasoning trace for any run.
 
 ### 8. Run the automated evaluation suite
 ```bash
-python eval_runner.py                # all 4 agents built so far
+python eval_runner.py                # all 7 agents in one run
 python eval_runner.py security        # just one agent
-python eval_runner.py security --runs 3   # reliability check, 3 runs per case
 ```
 Prints a recall/false-positive scorecard per agent against its fixture library.
 
@@ -234,23 +255,19 @@ Prints a recall/false-positive scorecard per agent against its fixture library.
 - ✅ Full local dev environment with Groq + Gemini + LangSmith wired up and verified
 - ✅ `github_fetcher.py` — given any PR link, returns a structured `file_context` object per changed file
 - ✅ `filter_python_files()` — splits fetched files into Python files (sent to agents) vs. non-Python files (skipped, but tracked and reportable)
-- ✅ **4 of 7 specialist agents built and evaluated:**
-  - **Bug-Hunter** — `pylint` + `flake8` + LLM, catches logic errors and runtime issues
-  - **Security** — `bandit` + a dedicated secret/credential-leak scanner (filenames + content patterns), catches vulnerabilities and accidentally committed secrets
-  - **Style** — `pylint` (convention/refactor only) + `black --check` + LLM, catches naming/formatting/readability issues
-  - **Test Coverage** — `ast` heuristic + self-contained `pytest`/`coverage.py` run + LLM, catches untested functions and missing edge cases, with an honestly documented scope limitation (can't see tests in separate files)
-- ✅ **Automated evaluation framework** (`eval_runner.py`) — fixture-based, LLM-as-judge grading, with multi-run reliability/consistency checking via `--runs`; now covering 13 test cases across 4 agents
+- ✅ **All 7 specialist agents built and evaluated** — see the agent table above for what each one pairs with and its key design decision
+- ✅ **Automated evaluation framework** (`eval_runner.py`) — fixture-based, LLM-as-judge grading; now covers 22 test cases across all 7 agents, runnable as one command
 
 ---
 
 ## Roadmap / Next Steps
 
-- [ ] Build the final 3 specialist agents (Documentation, Performance, Dependency), each with its own fixture-based eval cases — completes all 7 agents
-- [ ] Build the Coordinator Agent to merge, prioritize findings, and report skipped files
-- [ ] Wire everything together with LangGraph, including routing exceptions for Security's cross-language secret scan and Dependency's manifest-file routing
+- [ ] Build the Coordinator Agent to merge, dedupe, prioritize findings across all 7 reports, and note skipped files
+- [ ] Wire everything together with LangGraph, including the Python-file filter (Day 2) and the two routing exceptions documented above (Security's cross-language secret scan, Dependency's manifest-file routing)
 - [ ] Expose the pipeline via a FastAPI `/review` endpoint
 - [ ] Build a Streamlit demo UI
 - [ ] Stress-test with real PRs and debug using LangSmith traces
+- [ ] Add a second, whole-pipeline evaluation layer using LangSmith Evaluations (complementing the per-agent fixture harness with real-PR, end-to-end testing)
 - [ ] Deploy and finalize documentation with architecture diagram, screenshots, and live demo link
 - [ ] **Future work:** multi-language support (ESLint for JS/TS, Semgrep for cross-language security scanning)
 - [ ] **Future work:** sequential agent communication (agents referencing each other's findings)
@@ -259,4 +276,4 @@ Prints a recall/false-positive scorecard per agent against its fixture library.
 
 ## License
 
-This project is open source and available for anyone to reference or build on. (Add your preferred license here, e.g. MIT.)
+This project is open source and available for anyone to reference or build on.

@@ -1,0 +1,8 @@
+{
+  "description": "calculate_discount(), ShoppingCart, and ShoppingCart.total() all have zero docstrings.",
+  "doc_issues": [
+    "calculate_discount() has no docstring",
+    "ShoppingCart class has no docstring",
+    "total() method has no docstring"
+  ]
+}
