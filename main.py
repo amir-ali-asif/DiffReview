@@ -39,7 +39,7 @@ from graph import build_graph
 load_dotenv()
 
 app = FastAPI(
-    title="DiffReview API",
+    title="DiffReview: Multi-Agent Code Review",
     description="Submit a GitHub PR link and get back a full, AI-generated code review.",
     version="1.0.0",
 )
