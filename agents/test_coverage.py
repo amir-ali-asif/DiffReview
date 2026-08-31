@@ -83,7 +83,7 @@ def run_self_contained_coverage(code: str) -> str:
     """
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = os.path.join(tmp_dir, "module_under_test.py")
-        with open(tmp_path, "w") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(code)
 
         try:

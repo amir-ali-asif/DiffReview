@@ -31,7 +31,7 @@ load_dotenv()
 
 def run_radon_complexity(code: str) -> str:
     """Runs radon's cyclomatic complexity (cc) check and returns raw output."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 
@@ -53,7 +53,7 @@ def run_radon_complexity(code: str) -> str:
 
 def run_radon_maintainability(code: str) -> str:
     """Runs radon's maintainability index (mi) check and returns raw output."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 

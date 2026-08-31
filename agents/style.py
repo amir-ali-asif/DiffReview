@@ -33,7 +33,7 @@ load_dotenv()
 
 def run_pylint_style(code: str) -> str:
     """Runs pylint with ONLY convention (C) and refactor (R) checks enabled."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 
@@ -58,7 +58,7 @@ def run_black_check(code: str) -> str:
     Runs black in --check --diff mode, which does NOT modify the file —
     it only reports what it WOULD change to match standard formatting.
     """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 

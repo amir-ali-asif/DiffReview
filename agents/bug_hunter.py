@@ -32,6 +32,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 load_dotenv()
 
 
+
 def run_pylint(code: str) -> str:
     """
     Runs pylint on a string of Python code and returns its raw output.
@@ -41,7 +42,7 @@ def run_pylint(code: str) -> str:
     scan a Python string directly. We create a throwaway temp file,
     run pylint against it, capture the output, then delete the temp file.
     """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 
@@ -63,7 +64,7 @@ def run_pylint(code: str) -> str:
 
 def run_flake8(code: str) -> str:
     """Same idea as run_pylint, but for flake8."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 

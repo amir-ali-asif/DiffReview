@@ -55,7 +55,7 @@ def run_pip_audit(requirements_content: str) -> str:
     Runs pip-audit against a requirements.txt-style file and returns its
     raw output. Requires internet access to check live vulnerability data.
     """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as tmp:
         tmp.write(requirements_content)
         tmp_path = tmp.name
 

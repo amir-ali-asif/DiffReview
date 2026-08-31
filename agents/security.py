@@ -110,7 +110,7 @@ def scan_content_for_secrets(content: str):
 
 def run_bandit(code: str) -> str:
     """Runs bandit on a string of Python code and returns its raw output."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as tmp:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as tmp:
         tmp.write(code)
         tmp_path = tmp.name
 
