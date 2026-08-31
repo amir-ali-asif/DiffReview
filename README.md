@@ -2,7 +2,7 @@
 
 > A multi-agent AI system that replicates a full engineering review team, giving solo developers and small startups the same level of code review rigor that only large companies with dedicated departments can normally afford.
 
-**Status:** 🚧 In active development — Day 6 of 10 complete. Full pipeline runs end-to-end on real PRs.
+**Status:** 🚧 In active development — Day 8 of 10 complete. Full working demo: paste a PR link, get a live AI-generated review in the browser.
 
 ---
 
@@ -32,11 +32,22 @@ Multi-language support (e.g. ESLint for JS/TS) is a planned Future Work item, no
 
 ---
 
-## How It Works (Full Pipeline — Now Running End-to-End)
+## How It Works (Full Pipeline — Now Running End-to-End, With a Live UI)
 
 ```
-GitHub PR Link (input)
-        ↓
+                              ┌─────────────────────────┐
+                              │   Streamlit Frontend      │  ✅ Day 8
+                              │   (paste PR link, click   │
+                              │    "Run Review")          │
+                              └────────────┬─────────────┘
+                                           │ HTTP POST /review
+                                           ↓
+                              ┌─────────────────────────┐
+                              │   FastAPI Backend          │  ✅ Day 7
+                              │   (error handling, Groq→   │
+                              │    Gemini fallback)        │
+                              └────────────┬─────────────┘
+                                           ↓
 PyGithub fetches diff + old code + new code   ✅ built (Day 2)
         ↓
 Filter: Python files → agents | non-Python → skipped list   ✅ built (Day 6)
@@ -50,25 +61,15 @@ Filter: Python files → agents | non-Python → skipped list   ✅ built (Day 6
    │  5. Documentation Agent                  │  ✅ Day 5
    │  6. Performance Agent                    │  ✅ Day 5
    │  7. Dependency/License Agent†             │  ✅ Day 5
-   │  (each = static analysis tool + LLM,     │
-   │   all traced live in LangSmith)          │
-   │                                            │
-   │  *Security also scans ALL changed files   │
-   │   (any language) for secrets/keys         │
-   │  †Dependency only runs on manifest files   │
-   │   (requirements.txt, Pipfile, etc.)        │
    └────────────────┬─────────────────────────┘
                      ↓
               Coordinator Agent                  ✅ built + evaluated (Day 6)
-   (merges findings, resolves conflicts/duplicates,
-    prioritizes issues, notes skipped files,
-    writes final verdict)
                      ↓
-         Final Report (FastAPI + Streamlit)       ⏳ planned (Days 7-8)
+         Final Report → back to Streamlit UI       ✅ Day 8
          + Full reasoning trace in LangSmith
 ```
 
-**LangGraph orchestration (`graph.py`), built Day 6:** wires everything above into a single "fan-out, fan-in" graph — `fetch` feeds all 7 specialist nodes, which run in parallel, and all 7 feed into `coordinator`, which only runs once every specialist has finished. Each specialist node internally loops over every relevant changed file, so one graph node still reviews an entire PR's worth of files. `python graph.py` now runs the complete pipeline, start to finish, on a real PR link.
+*Security also scans ALL changed files (any language) for secrets/keys. †Dependency only runs on manifest files (requirements.txt, Pipfile, etc.)
 
 Each specialist agent combines the output of a **real static analysis tool** with **LLM reasoning** to explain findings in plain, human-readable language — this isn't "just prompting an LLM," it's real tooling plus AI interpretation, similar to how production tools like CodeRabbit and Sourcery work.
 
@@ -77,29 +78,40 @@ Each specialist agent combines the output of a **real static analysis tool** wit
 | # | Agent | Paired Tool | Notable design decision |
 |---|---|---|---|
 | 1 | Bug-Hunter | `pylint` + `flake8` | Template agent — the tool→LLM pattern every other agent reuses |
-| 2 | Security | `bandit` + custom secret scanner | Deterministic (non-LLM) detection for leaked credentials — too important to leave to model judgment |
+| 2 | Security | `bandit` + custom secret scanner | Deterministic (non-LLM) detection for leaked credentials |
 | 3 | Style/Readability | `pylint` (convention/refactor only) + `black --check` | Scoped tool flags to avoid duplicating Bug-Hunter's findings |
 | 4 | Test Coverage | `ast` heuristic + self-contained `pytest`/`coverage.py` | Honest scope limitation: can't see tests in separate files |
-| 5 | Documentation | Custom `ast`-based docstring analysis | Only agent with no external CLI tool — checks both missing AND low-quality docstrings |
+| 5 | Documentation | Custom `ast`-based docstring analysis | Only agent with no external CLI tool |
 | 6 | Performance | `radon` (complexity + maintainability) | LLM explicitly told to reason beyond radon's structural score |
-| 7 | Dependency/License | `pip-audit` | Only agent scoped to manifest files; also flags unpinned dependencies |
-| — | **Coordinator** | — (pure LLM reasoning) | **Deduplicates overlapping findings, prioritizes by real severity, writes one final verdict** |
+| 7 | Dependency/License | `pip-audit` | Only agent scoped to manifest files |
+| — | **Coordinator** | — (pure LLM reasoning) | Deduplicates overlapping findings, prioritizes by real severity, writes one final verdict |
 
 ### Coordinator Agent — Merging 7 Reports Into One Verdict
 
-Unlike the specialist agents, the Coordinator runs no static analysis tool at all — its input is the 7 agents' already-written reports, and its job is three things an LLM is genuinely well-suited for:
-
-1. **Deduplicate** — if two agents describe the same underlying issue in different words (e.g. Security calling something a "SQL injection vulnerability" while Bug-Hunter calls the same code "will throw unexpected errors"), merge them into ONE finding.
-2. **Prioritize** — order everything by real severity (Critical > Major > Minor), with agent type as a tiebreaker: Security > Bug-Hunter > Test Coverage > Performance > Dependency > Style > Documentation.
-3. **Write the final verdict** — a one-line summary, a clear recommendation (approve / request changes / block merge), then the deduplicated, prioritized findings, plus a transparency note on any files skipped by the Python-only agents.
+The Coordinator runs no static analysis tool — its input is the 7 agents' already-written reports, and it: (1) **deduplicates** overlapping findings described in different words, (2) **prioritizes** by real severity (Critical > Major > Minor, with Security > Bug-Hunter > Test Coverage > Performance > Dependency > Style > Documentation as a tiebreaker), and (3) **writes a final verdict** — a one-line summary, a merge recommendation, the deduplicated findings, and a transparency note on any skipped files.
 
 ### Security Agent — Secret & Credential Protection
 
-Beyond pairing with `bandit` for vulnerable code patterns, the Security agent includes a dedicated, **deterministic** check (not left to LLM judgment) that:
+Beyond pairing with `bandit`, the Security agent includes a dedicated, **deterministic** check (not left to LLM judgment) that flags known-risky filenames (`.env`, `*.pem`, `id_rsa`, etc.) and scans content for secret-like patterns (API keys, AWS keys, private key headers, hardcoded passwords). Findings are specific and actionable, e.g.: *"🚨 `.env` appears to have been committed — remove it with `git rm --cached .env`, rotate any exposed keys, and confirm `.env` is in `.gitignore`."*
 
-- Flags known-risky filenames committed in the PR — `.env`, `*.pem`, `*.key`, `id_rsa`, `credentials.json`, `service-account*.json`, etc. (`.env.example` is allowed)
-- Scans file contents/diffs for patterns that look like live secrets — AWS access keys, generic API key/token assignments, private key headers, hardcoded passwords
-- When something is found, the report is specific and actionable, e.g.: *"🚨 `.env` appears to have been committed — this likely contains live secrets. Remove it with `git rm --cached .env`, rotate any exposed keys immediately, and confirm `.env` is in `.gitignore`."*
+### Reliability: Automatic Groq → Gemini Fallback
+
+Every agent's LLM calls go through a shared `llm_client.py` module instead of calling Groq directly. If Groq fails for *any* reason — rate limit, outage, or a deprecated model (which genuinely happened mid-build: `llama-3.3-70b-versatile` was decommissioned by Groq on August 16, 2026) — the exact same request is automatically retried against Gemini, with zero code changes needed in any of the 8 agent files that use it. This was a deliberate architectural payoff: because every agent followed the same `llm.invoke(...)` pattern from Day 3 onward, adding this fallback was one mechanical 3-line change repeated 8 times, not 8 different bespoke fixes.
+
+### FastAPI Backend — `/review` Endpoint
+
+`main.py` exposes the full pipeline as a single `POST /review` endpoint (interactive docs at `/docs`), with error handling mapped to real HTTP status codes:
+
+| Failure | Status | Cause |
+|---|---|---|
+| Malformed PR URL | `400` | Doesn't match `github.com/.../pull/N` |
+| PR or repo not found | `404` | Invalid owner/repo/PR number |
+| GitHub rate limit hit | `429` | Too many requests to GitHub's API |
+| Both Groq and Gemini fail | `502` | Total LLM provider outage |
+
+### Streamlit Frontend — the Live Demo
+
+`app.py` is the interface recruiters and interviewers will actually click through: paste a PR link, click **Run Review**, watch a loading spinner while all 7 agents + the Coordinator run, then see a color-coded final verdict (red/yellow/green by severity) followed by 7 expandable sections — one per agent, each showing per-file findings with a lightweight severity badge. The frontend talks to the backend purely over HTTP (`requests.post(...)`), never importing the agents directly — this decoupling is what makes independent deployment of frontend and backend (Day 10) possible.
 
 ---
 
@@ -109,27 +121,14 @@ Rather than only testing agents by hand, this project includes **two complementa
 
 ### `eval_runner.py` — for the 7 specialist agents
 
-- Each agent has a library of test cases under `test_fixtures/<agent_name>/` — deliberately buggy/vulnerable code paired with a hand-written "expected findings" JSON file.
-- Fixtures generally follow a 3-case pattern: an **obvious** issue, a **subtle** issue (stress-tests whether the agent goes beyond what its paired tool flags outright), and a **clean-code control case** (tests for false positives). Security gets a 4th case for the leaked-`.env`-file scenario.
-- Grading uses **LLM-as-judge**: a separate, strict grading LLM call checks whether each expected finding is actually covered by the agent's report.
-- **Reliability checking (`--runs`):** since LLMs aren't perfectly deterministic even at `temperature=0`, each fixture case can be run multiple times (`python eval_runner.py bug_hunter --runs 3`), scored on majority vote, with any disagreement between runs flagged as **flaky**. Default is 1 run for fast iteration; `--runs 3`+ is for when a score needs to hold up statistically, not just anecdotally.
-- `python eval_runner.py` with no argument runs **all 7 agents** in one command.
+- Each agent has a library of test cases under `test_fixtures/<agent_name>/`: an **obvious** issue, a **subtle** issue, and a **clean-code control case** (Security gets a 4th, for the leaked-`.env` scenario).
+- Grading uses **LLM-as-judge** — a separate strict grading call checks whether each expected finding is actually covered by the agent's report.
+- **Reliability checking:** `python eval_runner.py <agent> --runs 3` runs each case multiple times, scores on majority vote, and flags any case where runs disagreed as **flaky** — because a single-run score doesn't account for LLM non-determinism.
+- `python eval_runner.py` with no argument runs **all 7 agents** in one command (22 total fixture cases).
 
-**Fixture coverage (7 agents, 22 cases):**
+### `eval_coordinator.py` — for the Coordinator
 
-| Agent | Cases | What's tested |
-|---|---|---|
-| Bug-Hunter | 3 | Empty-list crash, mutable default argument, clean code control |
-| Security | 4 | SQL injection, hardcoded API key, leaked `.env` file, secure code control |
-| Style | 3 | Bad naming/formatting, deep nesting, clean PEP8 control |
-| Test Coverage | 3 | No tests, incomplete edge-case tests, fully tested control |
-| Documentation | 3 | Missing docstrings, thin/low-value docstrings, well-documented control |
-| Performance | 3 | O(n²) nested loop, string-concat-in-loop, efficient code control |
-| Dependency | 3 | Known-vulnerable pinned package, unpinned dependencies, safely pinned control |
-
-### `eval_coordinator.py` — for the Coordinator, added Day 6
-
-The Coordinator's job is fundamentally different (reasoning about pre-written reports, not analyzing code), so it gets its own small, purpose-built harness rather than being forced into `eval_runner.py`'s per-file fixture shape. Fixtures live under `test_fixtures/coordinator/` as mock-report JSON files, and each is graded on a different property:
+A separate, purpose-built harness since the Coordinator's input (pre-written mock reports, not code) and the properties worth checking (dedup, ordering, honesty) are fundamentally different from the specialist agents' recall/false-positive grading:
 
 | Case | Property tested |
 |---|---|
@@ -138,8 +137,6 @@ The Coordinator's job is fundamentally different (reasoning about pre-written re
 | `case_03` (no_hallucination) | When every input says "no issues," the verdict doesn't invent problems |
 | `case_04` (skipped_files_note) | Skipped files are mentioned as a transparency note, not treated as a finding |
 
-Run with `python eval_coordinator.py`.
-
 ---
 
 ## Tech Stack (100% Free Tools)
@@ -147,17 +144,15 @@ Run with `python eval_coordinator.py`.
 | Layer | Tool |
 |---|---|
 | Agent Orchestration | LangGraph |
-| LLM | Groq API (`openai/gpt-oss-120b`), Gemini API as fallback |
+| LLM | Groq API (`openai/gpt-oss-120b`), with automatic Gemini (`gemini-2.5-flash`) fallback |
 | Code Parsing | Python `ast` module |
 | PR Fetching | PyGithub |
 | Static Analysis | `pylint`, `flake8`, `bandit`, `coverage.py`, `black`, `pytest`, `radon`, `pip-audit` |
 | Backend | FastAPI |
 | Frontend | Streamlit |
 | Observability | LangSmith |
-| Evaluation | Two custom fixture-based harnesses (LLM-as-judge, with multi-run reliability checking for specialist agents) |
+| Evaluation | Two custom fixture-based harnesses (LLM-as-judge, with multi-run reliability checking) |
 | Hosting | Streamlit Community Cloud (frontend), Render / Hugging Face Spaces (backend) |
-
-> **Note:** Groq deprecated `llama-3.3-70b-versatile` (decommissioned August 16, 2026). All agents now use `openai/gpt-oss-120b`, Groq's recommended free-tier replacement.
 
 ---
 
@@ -171,9 +166,9 @@ Run with `python eval_coordinator.py`.
 | 4 | Security, Style, Test Coverage Agents | ✅ Done |
 | 5 | Documentation, Performance, Dependency Agents — all 7 agents complete | ✅ Done |
 | 6 | Coordinator Agent + LangGraph orchestration — first end-to-end run | ✅ Done |
-| 7 | FastAPI backend | ⏳ Next |
-| 8 | Streamlit frontend | ⏳ Planned |
-| 9 | Testing, debugging via LangSmith | ⏳ Planned |
+| 7 | FastAPI backend + Groq→Gemini fallback | ✅ Done |
+| 8 | Streamlit frontend — full working demo | ✅ Done |
+| 9 | Testing, debugging via LangSmith | ⏳ Next |
 | 10 | Deployment + portfolio polish | ⏳ Planned |
 
 ---
@@ -200,15 +195,17 @@ multi-agent-code-review/
 │   ├── documentation/                      # ✅ 3 fixture cases
 │   ├── performance/                         # ✅ 3 fixture cases
 │   ├── dependency/                           # ✅ 3 fixture cases
-│   └── coordinator/                           # ✅ 4 mock-report cases (dedup, ordering, etc.)
-├── eval_runner.py                                # ✅ evaluates all 7 specialist agents (supports --runs)
-├── eval_coordinator.py                            # ✅ evaluates the Coordinator's reasoning properties
-├── github_fetcher.py                               # ✅ pulls PR diff + old/new code via PyGithub
-├── graph.py                                          # ✅ LangGraph pipeline — fetch → 7 agents → coordinator
-├── app.py                                              # Streamlit frontend (built Day 8)
+│   └── coordinator/                           # ✅ 4 mock-report cases
+├── llm_client.py                                 # ✅ shared Groq→Gemini fallback wrapper
+├── eval_runner.py                                 # ✅ evaluates all 7 specialist agents (supports --runs)
+├── eval_coordinator.py                             # ✅ evaluates the Coordinator's reasoning properties
+├── github_fetcher.py                                # ✅ pulls PR diff + old/new code via PyGithub
+├── graph.py                                           # ✅ LangGraph pipeline — fetch → 7 agents → coordinator
+├── main.py                                              # ✅ FastAPI backend (/review endpoint)
+├── app.py                                                 # ✅ Streamlit frontend
 ├── requirements.txt
-├── .env                                                 # your secret keys (never committed)
-├── .env.example                                           # safe template of required keys
+├── .env                                                     # your secret keys (never committed)
+├── .env.example                                               # safe template of required keys
 └── .gitignore
 ```
 
@@ -243,25 +240,31 @@ You'll need free API keys from:
 - [Groq](https://console.groq.com) — primary LLM
 - [Google AI Studio](https://aistudio.google.com) — Gemini fallback LLM
 - [LangSmith](https://smith.langchain.com) — tracing/observability
-- A [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope) — needed to fetch PR data
+- A [GitHub Personal Access Token](https://github.com/settings/tokens) (classic, `repo` scope)
 
 ### 5. Verify the setup
 ```bash
 python hello_world.py
 ```
 
-### 6. Run the full pipeline end-to-end
-Set `TEST_PR_URL` in your `.env` to any real PR link, then:
+### 6. Run the full pipeline from the command line (no UI)
 ```bash
 python graph.py
 ```
-This runs all 7 specialist agents plus the Coordinator and prints one final, consolidated report — the entire system, start to finish, in one command.
 
-### 7. Test the Coordinator on its own (faster, no PR needed)
+### 7. Run the live demo (recommended way to try it)
+
+**Terminal 1 — start the backend:**
 ```bash
-python agents/coordinator.py
+uvicorn main:app --reload
 ```
-Runs a built-in mock scenario that checks whether overlapping findings get correctly merged.
+
+**Terminal 2 — start the frontend:**
+```bash
+streamlit run app.py
+```
+
+Then open the Streamlit tab that pops up (usually `http://localhost:8501`), paste a real PR link, and click **Run Review**.
 
 ### 8. Run the automated evaluation suites
 ```bash
@@ -275,23 +278,26 @@ python eval_coordinator.py                 # the Coordinator's reasoning propert
 ## What's Working So Far
 
 - ✅ Full local dev environment with Groq + Gemini + LangSmith wired up and verified
-- ✅ `github_fetcher.py` — returns a structured `file_context` object per changed file; `filter_python_files()` now returns full file contexts for skipped files too (Day 6 update), enabling Security and Dependency to act on non-Python files
-- ✅ **All 7 specialist agents built and evaluated** — see the agent table above
-- ✅ **Coordinator agent** — deduplicates, prioritizes by severity, and writes one final verdict from all 7 agents' reports
-- ✅ **`graph.py`** — the complete pipeline wired together with LangGraph in a fan-out/fan-in pattern; runs end-to-end on a real PR link
-- ✅ **Two evaluation harnesses** — `eval_runner.py` (22 fixture cases across the 7 specialist agents, with multi-run reliability checking) and `eval_coordinator.py` (4 mock-report cases checking dedup, severity ordering, hallucination-resistance, and skipped-file handling)
+- ✅ **All 7 specialist agents + the Coordinator**, built and evaluated
+- ✅ **`graph.py`** — the complete pipeline wired together with LangGraph in a fan-out/fan-in pattern
+- ✅ **Automatic Groq → Gemini fallback** (`llm_client.py`) across every agent, with a real deprecation event already survived during the build
+- ✅ **FastAPI backend** (`main.py`) — a working `/review` endpoint with mapped error handling for invalid URLs, missing PRs, rate limits, and total LLM failure
+- ✅ **Streamlit frontend** (`app.py`) — a full, working, end-to-end demo: paste a link, click a button, get a color-coded verdict and 7 expandable per-agent reports in the browser
+- ✅ **Two evaluation harnesses** — `eval_runner.py` (22 fixture cases, multi-run reliability checking) and `eval_coordinator.py` (4 mock-report cases)
 
 ---
 
 ## Roadmap / Next Steps
 
-- [ ] Expose the pipeline via a FastAPI `/review` endpoint, with error handling for invalid PR links, GitHub rate limits, and LLM provider failures
-- [ ] Build a Streamlit demo UI
-- [ ] Stress-test with real PRs and debug using LangSmith traces
-- [ ] Add a second, whole-pipeline evaluation layer using LangSmith Evaluations (complementing the two fixture harnesses with real-PR, end-to-end testing)
-- [ ] Deploy and finalize documentation with architecture diagram, screenshots, and live demo link
+- [ ] Run the full pipeline on 5-6 different real PRs and use LangSmith traces to find and fix weak spots
+- [ ] Handle edge cases: empty PRs, documentation-only PRs, very large PRs (rate limit handling)
+- [ ] Write up a concrete "caught and fixed this using LangSmith" debugging story for the README/portfolio
+- [ ] Add a whole-pipeline evaluation layer using LangSmith Evaluations, complementing the two fixture harnesses with real-PR, end-to-end testing
+- [ ] Deploy backend (Render/HF Spaces) and frontend (Streamlit Community Cloud); confirm the live deployed app works end-to-end
+- [ ] Finalize documentation: architecture diagram, screenshots/GIF of the app, link to live demo
 - [ ] **Future work:** multi-language support (ESLint for JS/TS, Semgrep for cross-language security scanning)
 - [ ] **Future work:** sequential agent communication (agents referencing each other's findings)
+- [ ] **Future work:** full-repository checkout for genuinely accurate test coverage analysis (vs. today's single-file visibility)
 
 ---
 
