@@ -86,6 +86,13 @@ st.caption(
     "process would provide, in one automated pass."
 )
 
+st.warning(
+    "⚠️ This project runs on Groq's **free tier**, which has a limited "
+    "token-per-minute quota. Reviewing many files at once can trip a rate "
+    "limit. For best results, please test with **small PRs (1-3 changed "
+    "files)** — larger PRs may be slower or occasionally fail."
+)
+
 pr_url = st.text_input(
     "GitHub PR link",
     placeholder="https://github.com/owner/repo/pull/123",
