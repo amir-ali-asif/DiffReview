@@ -1,0 +1,35 @@
+# render.yaml
+# -------------
+# Day 10 file — lets Render deploy this backend automatically from a
+# "Blueprint" (Render's infrastructure-as-code feature) instead of
+# manually clicking through every setting in their dashboard.
+#
+# This is optional — the guide also explains the manual dashboard steps
+# in case you'd rather do it that way — but committing this file is a
+# nice touch: it documents your exact deployment configuration directly
+# in the repo, and lets anyone else spin up the same setup with one click.
+#
+# "sync: false" on the secret keys means Render will prompt for their
+# values in the dashboard rather than expecting them committed here —
+# your real keys should NEVER be written into this file.
+
+services:
+  - type: web
+    name: diffreview-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: LANGCHAIN_API_KEY
+        sync: false
+      - key: LANGCHAIN_TRACING_V2
+        value: "true"
+      - key: LANGCHAIN_PROJECT
+        value: "multi-agent-code-review"

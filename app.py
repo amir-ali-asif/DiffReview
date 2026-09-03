@@ -22,15 +22,25 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Multi-Agent Code Reviewer",
+    page_title="DiffReview: Multi-Agent Code Reviewer",
     page_icon="🤖",
     layout="wide",
 )
 
-# The backend URL is configurable via an environment variable so this
-# same file works locally (default) and once deployed (Day 10), where
-# the frontend and backend usually live at different URLs.
-BACKEND_URL = os.getenv("FASTAPI_URL", "http://127.0.0.1:8000")
+# The backend URL is configurable so this same file works locally
+# (default) and once deployed. DAY 10 UPDATE: on Streamlit Community
+# Cloud, config is set via "Secrets" (a TOML block in the app's
+# settings), accessed through st.secrets — not a plain OS environment
+# variable. Locally, there's no secrets.toml file, so st.secrets raises
+# an error, which we catch and fall back to a normal env var instead.
+def _get_backend_url() -> str:
+    try:
+        return st.secrets["FASTAPI_URL"]
+    except (KeyError, FileNotFoundError):
+        return os.getenv("FASTAPI_URL", "http://127.0.0.1:8000")
+
+
+BACKEND_URL = _get_backend_url()
 
 # Icon + display name for each agent — used to build the expandable
 # sections. Keeping this as one lookup table means adding an 8th agent

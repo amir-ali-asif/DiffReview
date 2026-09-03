@@ -31,6 +31,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from github.GithubException import GithubException
 
@@ -39,9 +40,22 @@ from graph import build_graph
 load_dotenv()
 
 app = FastAPI(
-    title="DiffReview: Multi-Agent Code Review",
+    title="DiffReview: Multi-Agent Code Review API",
     description="Submit a GitHub PR link and get back a full, AI-generated code review.",
     version="1.0.0",
+)
+
+# DAY 10: needed once the frontend (Streamlit Community Cloud) and backend
+# (Render) live on two different domains — without this, the browser
+# blocks the frontend's requests to the backend as a cross-origin request.
+# allow_origins=["*"] is fine for a public portfolio demo with no private
+# data; a real production app would list only its actual frontend URL(s).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # The graph is built once at startup, not on every request — building it
@@ -88,7 +102,7 @@ class ReviewResponse(BaseModel):
 @app.get("/")
 def health_check():
     """Simple health check — confirms the API is running."""
-    return {"status": "ok", "service": "multi-agent-code-review-api"}
+    return {"status": "ok", "service": "diffreview-multi-agent-code-review-api"}
 
 
 @app.post("/review", response_model=ReviewResponse)
@@ -176,6 +190,12 @@ def review_pull_request(request: ReviewRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    print("Starting API at http://127.0.0.1:8000")
-    print("Interactive docs available at http://127.0.0.1:8000/docs")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    # DAY 10: deployment platforms like Render assign a port dynamically
+    # via the PORT environment variable — binding to a hardcoded 8000
+    # would fail there. Locally, this just falls back to 8000 as before.
+    # Binding to 0.0.0.0 (not 127.0.0.1) is required for the app to be
+    # reachable from outside its own container once deployed.
+    port = int(os.getenv("PORT", 8000))
+    print(f"Starting API on port {port}")
+    print(f"Interactive docs available at http://127.0.0.1:{port}/docs")
+    uvicorn.run(app, host="0.0.0.0", port=port)
